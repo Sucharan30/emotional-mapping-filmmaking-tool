@@ -1,0 +1,88 @@
+"""
+services/projects.py — Project lifecycle management.
+"""
+
+from __future__ import annotations
+
+import uuid
+from typing import Optional, Sequence
+
+from sqlalchemy import delete, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from models import Project
+from schemas import ProjectCreate, ProjectUpdate
+
+
+async def create_project(
+    db: AsyncSession, user_id: uuid.UUID, data: ProjectCreate
+) -> Project:
+    project = Project(
+        user_id=user_id,
+        name=data.name,
+        type=data.type,
+        description=data.description,
+    )
+    db.add(project)
+    await db.commit()
+    await db.refresh(project)
+    return project
+
+
+async def get_projects_for_user(
+    db: AsyncSession, user_id: uuid.UUID, limit: int = 50, offset: int = 0
+) -> tuple[Sequence[Project], int]:
+    # Total count using sqlalchemy func.count
+    count_query = select(func.count(Project.id)).where(Project.user_id == user_id)
+    total = await db.scalar(count_query) or 0
+
+    # Items
+    query = (
+        select(Project)
+        .where(Project.user_id == user_id)
+        .order_by(Project.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    result = await db.execute(query)
+    return result.scalars().all(), total
+
+
+async def get_project_by_id(
+    db: AsyncSession, project_id: uuid.UUID, user_id: uuid.UUID
+) -> Optional[Project]:
+    query = (
+        select(Project)
+        .where(Project.id == project_id, Project.user_id == user_id)
+        .options(selectinload(Project.scenes))
+    )
+    result = await db.execute(query)
+    return result.scalar_one_or_none()
+
+
+async def update_project(
+    db: AsyncSession, project_id: uuid.UUID, user_id: uuid.UUID, data: ProjectUpdate
+) -> Optional[Project]:
+    project = await get_project_by_id(db, project_id, user_id)
+    if not project:
+        return None
+
+    update_data = data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(project, key, value)
+
+    await db.commit()
+    await db.refresh(project)
+    return project
+
+
+async def delete_project(
+    db: AsyncSession, project_id: uuid.UUID, user_id: uuid.UUID
+) -> bool:
+    query = delete(Project).where(
+        Project.id == project_id, Project.user_id == user_id
+    )
+    result = await db.execute(query)
+    await db.commit()
+    return result.rowcount > 0
