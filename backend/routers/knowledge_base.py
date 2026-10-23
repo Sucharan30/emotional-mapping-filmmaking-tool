@@ -75,12 +75,12 @@ async def list_knowledge_base(
 
 @router.get("/{kb_id}", response_model=KnowledgeBaseResponse)
 async def get_knowledge_base_item(
-    kb_id: uuid.UUID,
+    kb_id: int,
     user: AuthUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Retrieve a single knowledge base entry by UUID.
+    Retrieve a single knowledge base entry by integer ID.
     """
     item = await kb_service.get_kb_item_by_id(db, kb_id)
     if not item:

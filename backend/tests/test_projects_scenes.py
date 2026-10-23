@@ -10,7 +10,7 @@ import pytest
 from httpx import AsyncClient
 
 from models import Project, Scene
-from tests.conftest import OTHER_USER_ID, TEST_USER_ID
+from tests.conftest import TEST_USER_ID
 
 
 def make_project(user_id=TEST_USER_ID, name="Thriller Feature"):
@@ -25,9 +25,9 @@ def make_project(user_id=TEST_USER_ID, name="Thriller Feature"):
     )
 
 
-def make_scene(project_id, description="Detective confronts suspect in dimly lit interrogation room."):
+def make_scene(project_id, scene_id=1, description="Detective confronts suspect in dimly lit interrogation room."):
     return Scene(
-        id=uuid.uuid4(),
+        id=scene_id,
         project_id=project_id,
         description=description,
         target_emotion="tension",
@@ -59,7 +59,6 @@ async def test_create_project(async_client: AsyncClient):
 @pytest.mark.asyncio
 async def test_get_project_ownership_isolation(async_client: AsyncClient):
     """User cannot access another user's project (returns 404 to avoid ID leakage)."""
-    # Service returns None because user_id does not match
     with patch("services.projects.get_project_by_id", AsyncMock(return_value=None)):
         response = await async_client.get(f"/api/v1/projects/{uuid.uuid4()}")
 
@@ -100,6 +99,7 @@ async def test_create_scene_success(async_client: AsyncClient):
     assert response.status_code == 201
     data = response.json()
     assert data["target_emotion"] == "tension"
+    assert data["id"] == 1
 
 
 @pytest.mark.asyncio
@@ -126,7 +126,7 @@ async def test_create_scene_unauthorized_project(async_client: AsyncClient):
 async def test_get_scene_ownership_isolation(async_client: AsyncClient):
     """User cannot access another user's scene (returns 404)."""
     with patch("services.scenes.get_scene_by_id", AsyncMock(return_value=None)):
-        response = await async_client.get(f"/api/v1/scenes/{uuid.uuid4()}")
+        response = await async_client.get("/api/v1/scenes/999")
 
     assert response.status_code == 404
     data = response.json()
@@ -137,7 +137,7 @@ async def test_get_scene_ownership_isolation(async_client: AsyncClient):
 async def test_get_scene_recommendations_ownership_isolation(async_client: AsyncClient):
     """User cannot retrieve recommendations for another user's scene."""
     with patch("services.scenes.get_scene_by_id", AsyncMock(return_value=None)):
-        response = await async_client.get(f"/api/v1/scenes/{uuid.uuid4()}/recommendations")
+        response = await async_client.get("/api/v1/scenes/999/recommendations")
 
     assert response.status_code == 404
     data = response.json()

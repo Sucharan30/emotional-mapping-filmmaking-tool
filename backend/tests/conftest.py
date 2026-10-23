@@ -5,9 +5,17 @@ All tests use mocks/fakes and DO NOT connect to live Supabase or Gemini.
 
 from __future__ import annotations
 
+import os
 import uuid
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock
+
+# Explicit test defaults so tests never depend on local .env presence
+os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://mock:mock@localhost:5432/mock")
+os.environ.setdefault("SUPABASE_URL", "https://mock.supabase.co")
+os.environ.setdefault("SUPABASE_ANON_KEY", "mock-anon-key")
+os.environ.setdefault("GEMINI_API_KEY", "mock-gemini-key")
+os.environ.setdefault("AUTH_MODE", "dev")
 
 import pytest
 import pytest_asyncio

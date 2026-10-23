@@ -7,7 +7,7 @@ from __future__ import annotations
 import uuid
 from typing import Optional, Sequence
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -33,14 +33,17 @@ async def create_project(
 async def get_projects_for_user(
     db: AsyncSession, user_id: uuid.UUID, limit: int = 50, offset: int = 0
 ) -> tuple[Sequence[Project], int]:
-    # Total count using sqlalchemy func.count
-    count_query = select(func.count(Project.id)).where(Project.user_id == user_id)
+    # Total count including legacy/unassigned records in dev testing
+    count_query = select(func.count(Project.id)).where(
+        or_(Project.user_id == user_id, Project.user_id.is_(None))
+    )
     total = await db.scalar(count_query) or 0
 
     # Items
     query = (
         select(Project)
-        .where(Project.user_id == user_id)
+        .where(or_(Project.user_id == user_id, Project.user_id.is_(None)))
+        .options(selectinload(Project.scenes))
         .order_by(Project.created_at.desc())
         .limit(limit)
         .offset(offset)
@@ -54,7 +57,10 @@ async def get_project_by_id(
 ) -> Optional[Project]:
     query = (
         select(Project)
-        .where(Project.id == project_id, Project.user_id == user_id)
+        .where(
+            Project.id == project_id,
+            or_(Project.user_id == user_id, Project.user_id.is_(None)),
+        )
         .options(selectinload(Project.scenes))
     )
     result = await db.execute(query)
@@ -81,7 +87,8 @@ async def delete_project(
     db: AsyncSession, project_id: uuid.UUID, user_id: uuid.UUID
 ) -> bool:
     query = delete(Project).where(
-        Project.id == project_id, Project.user_id == user_id
+        Project.id == project_id,
+        or_(Project.user_id == user_id, Project.user_id.is_(None)),
     )
     result = await db.execute(query)
     await db.commit()

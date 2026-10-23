@@ -9,6 +9,10 @@ __pycache__/
 .env
 .env.*
 
+# Tests & Scratch
+.pytest_cache/
+test_supabase.py
+
 # IDE
 .vscode/
 .idea/

@@ -2,7 +2,6 @@
 tests/test_knowledge_base.py — Knowledge base API and service unit tests.
 """
 
-import uuid
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 
@@ -11,6 +10,8 @@ from httpx import AsyncClient
 
 from models import KnowledgeBase
 
+_kb_id_counter = 1
+
 
 def make_kb_item(
     name: str = "Low Angle",
@@ -18,8 +19,9 @@ def make_kb_item(
     emotions: list[str] | None = None,
     review_status: str = "reviewed",
 ) -> KnowledgeBase:
-    return KnowledgeBase(
-        id=uuid.uuid4(),
+    global _kb_id_counter
+    item = KnowledgeBase(
+        id=_kb_id_counter,
         technique_name=name,
         category=category,
         visual_characteristic="Camera positioned below subject eye line pointing up.",
@@ -32,6 +34,8 @@ def make_kb_item(
         source_note="Film analysis textbook chapter 4.",
         created_at=datetime.now(timezone.utc),
     )
+    _kb_id_counter += 1
+    return item
 
 
 @pytest.mark.asyncio
@@ -99,7 +103,7 @@ async def test_get_knowledge_base_by_id_found(async_client: AsyncClient):
 async def test_get_knowledge_base_by_id_not_found(async_client: AsyncClient):
     """Non-existent technique ID returns HTTP 404."""
     with patch("services.knowledge_base.get_kb_item_by_id", AsyncMock(return_value=None)):
-        response = await async_client.get(f"/api/v1/knowledge-base/{uuid.uuid4()}")
+        response = await async_client.get("/api/v1/knowledge-base/99999")
 
     assert response.status_code == 404
     data = response.json()

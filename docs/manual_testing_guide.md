@@ -5,20 +5,33 @@ This guide is designed for you to test and verify the entire backend locally on 
 
 ---
 
-## Step 0: Prerequisites & SQL Reconciliation
+## Step 0: Diagnostic Inspection & SQL Reconciliation
 
-If you have already executed migrations `001`, `002`, and `003` in your Supabase SQL Editor:
-1. Open the Supabase Dashboard -> **SQL Editor** -> **New query**.
-2. Open `backend/sql/004_schema_reconciliation.sql` in your editor.
+### A. Run Diagnostic Queries (Optional & Read-Only)
+1. Open Supabase Dashboard -> **SQL Editor** -> **New query**.
+2. Open [`backend/sql/diagnostic_queries.sql`](file:///d:/CreatED/Emotional%20Mapping%20Film%20Making%20tool/backend/sql/diagnostic_queries.sql).
+3. Paste and run to inspect tables, columns, indexes, and constraints. (Safe, 100% read-only).
+
+### B. Run Migration 005 (Schema Reconciliation)
+1. In Supabase Dashboard -> **SQL Editor** -> **New query**.
+2. Open [`backend/sql/005_schema_reconciliation.sql`](file:///d:/CreatED/Emotional%20Mapping%20Film%20Making%20tool/backend/sql/005_schema_reconciliation.sql).
 3. Copy the entire file content, paste it into the Supabase SQL editor, and click **Run**.
-4. **Why run this?** It adds performance indexes for foreign keys (`user_id`, `project_id`, `scene_id`, `category`, and `potential_emotions`) and creates the `updated_at` trigger without touching or deleting any existing tables or rows.
+4. **Why run this?**
+   - Preserves all existing tables and data (preserves `scenes.id` and `shot_recommendations.id` as integer, `projects.id` as UUID).
+   - Adds missing Shot Designer columns: `production_budget`, `budget_notes`, `rank`, `context_caveat`, `budget_fit`, `budget_fit_reason`, `knowledge_base_ids`, `model_name`.
+   - Adds missing Knowledge Base columns: `equipment_needs`, `typical_complexity`, `review_status`, `source_note`.
+   - Creates `ai_usage` table if missing.
+   - Adds performance indexes and automatic `updated_at` trigger for projects.
+   - Enables RLS on all tables with zero data deletion.
 5. **Read-only verification query:**
    ```sql
-   SELECT indexname, tablename FROM pg_indexes 
-   WHERE schemaname = 'public' 
-     AND indexname IN ('idx_projects_user_id', 'idx_scenes_project_id', 'idx_shot_recommendations_scene_id');
+   SELECT table_name, column_name, data_type 
+   FROM information_schema.columns 
+   WHERE table_schema = 'public' 
+     AND table_name = 'scenes' 
+     AND column_name IN ('id', 'production_budget', 'budget_notes');
    ```
-   *Success:* Returns 3 rows showing the new indexes on `projects`, `scenes`, and `shot_recommendations`.
+   *Success:* Returns 3 rows showing `id` is `integer` and `production_budget` / `budget_notes` exist.
 
 ---
 

@@ -158,13 +158,30 @@ Create a scene under an owned project.
   "budget_notes": "Single room interior, neon sign spill from outside."
 }
 ```
-- **Response `201 Created`:** `SceneResponse` object.
+- **Response `201 Created`:**
+```json
+{
+  "id": 1,
+  "project_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "description": "The protagonist sits at the rain-streaked diner booth watching the door.",
+  "target_emotion": "isolation",
+  "character_focus": "neutral_observer",
+  "production_budget": "low",
+  "budget_notes": "Single room interior, neon sign spill from outside.",
+  "video_url": null,
+  "video_analysis": null,
+  "experiment_group_id": null,
+  "variant_label": null,
+  "created_at": "2026-10-23T12:00:00Z",
+  "shot_recommendations": null
+}
+```
 - **Response `404 Not Found`:** If `project_id` does not exist or belongs to another user.
 
 ### `GET /api/v1/scenes/{scene_id}`
 Retrieve a scene and its recommendations.
 
-- **Response `200 OK`:** `SceneResponse` object.
+- **Response `200 OK`:** `SceneResponse` object (with populated `shot_recommendations`).
 
 ### `PATCH /api/v1/scenes/{scene_id}`
 Update scene description, emotion, character focus, or budget.
@@ -189,19 +206,19 @@ Invokes the Gemini AI pipeline to generate 4–5 distinct cinematography recomme
 - **Request Body:**
 ```json
 {
-  "scene_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+  "scene_id": 1
 }
 ```
 
 - **Response `200 OK`:**
 ```json
 {
-  "scene_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "scene_id": 1,
   "model_used": "gemini-2.0-flash",
   "recommendations": [
     {
-      "id": "76dc1ff4-29ec-4581-9b6d-a7aef14f8202",
-      "scene_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "id": 1,
+      "scene_id": 1,
       "rank": 1,
       "perspective_name": "Intimate High-Angle POV",
       "reasoning": "Elevating the camera slightly above eye level compresses the character into the booth corner, creating visual helplessness while maintaining empathy.",
@@ -216,9 +233,7 @@ Invokes the Gemini AI pipeline to generate 4–5 distinct cinematography recomme
       "production_complexity_reason": "Achievable with a standard tripod and single camera operator.",
       "budget_fit": "good_fit",
       "budget_fit_reason": "No specialized cranes or dollies needed; ideal for low-budget productions.",
-      "knowledge_base_ids": [
-        "c0a80123-0000-0000-0000-000000000001"
-      ],
+      "knowledge_base_ids": [1],
       "model_name": "gemini-2.0-flash",
       "created_at": "2026-10-17T12:30:00Z"
     }
@@ -252,7 +267,7 @@ Browse cinematography techniques.
 {
   "items": [
     {
-      "id": "uuid",
+      "id": 1,
       "technique_name": "Low Angle",
       "category": "angle",
       "visual_characteristic": "Camera positioned below subject eye line...",
@@ -273,7 +288,7 @@ Browse cinematography techniques.
 ```
 
 ### `GET /api/v1/knowledge-base/{kb_id}`
-Retrieve a single cinematography technique by UUID.
+Retrieve a single cinematography technique by integer ID.
 
 - **Response `200 OK`:** `KnowledgeBaseResponse` object.
-- **Response `404 Not Found`:** If technique UUID does not exist.
+- **Response `404 Not Found`:** If technique ID does not exist.

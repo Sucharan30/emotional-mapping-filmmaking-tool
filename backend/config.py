@@ -16,14 +16,18 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(".env", "../.env"),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
     )
 
-    # ── Environment ─────────────────────────────────────────
+    # ── Environment & Auth Mode ─────────────────────────────
     env: str = Field("development", description="development | staging | production")
+    auth_mode: str = Field(
+        "dev",
+        description="Auth mode: 'dev' (bypasses auth with default dev user) or 'supabase' (enforces JWT)",
+    )
 
     # ── Database ─────────────────────────────────────────────
     # Use the Supabase TRANSACTION POOLER (port 6543, pgBouncer).
@@ -31,7 +35,7 @@ class Settings(BaseSettings):
     # Find it: Supabase Dashboard → Project Settings → Database
     #           → Connection pooling → Transaction mode → URI
     database_url: str = Field(
-        ...,
+        "postgresql://postgres:postgres@localhost:5432/postgres",
         description=(
             "PostgreSQL connection URL. Use Supabase transaction pooler "
             "(port 6543) for Render deployments."
@@ -39,11 +43,11 @@ class Settings(BaseSettings):
     )
 
     # ── Supabase ──────────────────────────────────────────────
-    supabase_url: str = Field(..., description="Supabase project URL")
+    supabase_url: str = Field("https://example.supabase.co", description="Supabase project URL")
 
     # Accept both SUPABASE_ANON_KEY (preferred) and legacy SUPABASE_PUBLISHABLE_KEY
     supabase_anon_key: str = Field(
-        ...,
+        "dummy-anon-key",
         validation_alias=AliasChoices("SUPABASE_ANON_KEY", "SUPABASE_PUBLISHABLE_KEY"),
         description="Supabase public anon key (safe to use server-side for auth verification)",
     )
@@ -60,7 +64,7 @@ class Settings(BaseSettings):
     llm_provider: str = Field("gemini", description="LLM provider: gemini")
 
     gemini_api_key: str = Field(
-        ...,
+        "dummy-gemini-key",
         description="Google Gemini API key from https://aistudio.google.com/",
     )
 

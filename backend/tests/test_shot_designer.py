@@ -16,14 +16,13 @@ from services.shot_designer import (
     InsufficientSceneDataError,
     SceneNotFoundError,
     generate_shot_recommendations,
-    get_daily_generation_count,
 )
 from tests.conftest import FakeLLMProvider, TEST_USER_ID
 
 
-def make_scene(scene_id=None, desc="A character sits alone in a rain-streaked diner booth."):
+def make_scene(scene_id=1, desc="A character sits alone in a rain-streaked diner booth."):
     return Scene(
-        id=scene_id or uuid.uuid4(),
+        id=scene_id,
         project_id=uuid.uuid4(),
         description=desc,
         target_emotion="isolation",
@@ -39,10 +38,10 @@ def make_scene(scene_id=None, desc="A character sits alone in a rain-streaked di
 @pytest.mark.asyncio
 async def test_design_shots_success(async_client: AsyncClient, mock_db_session):
     """Successful Shot Designer generation returns 4-5 recommendations and model metadata."""
-    scene_id = uuid.uuid4()
+    scene_id = 1
     mock_recs = [
         ShotRecommendation(
-            id=uuid.uuid4(),
+            id=1,
             scene_id=scene_id,
             rank=1,
             perspective_name="Intimate High-Angle POV",
@@ -62,12 +61,12 @@ async def test_design_shots_success(async_client: AsyncClient, mock_db_session):
     with patch("services.shot_designer.generate_shot_recommendations", AsyncMock(return_value=mock_recs)):
         response = await async_client.post(
             "/api/v1/scenes/design-shots",
-            json={"scene_id": str(scene_id)}
+            json={"scene_id": scene_id}
         )
 
     assert response.status_code == 200
     data = response.json()
-    assert data["scene_id"] == str(scene_id)
+    assert data["scene_id"] == scene_id
     assert len(data["recommendations"]) == 1
     assert data["model_used"] == "gemini-mock"
 
@@ -81,7 +80,7 @@ async def test_design_shots_daily_limit_exceeded(async_client: AsyncClient):
     ):
         response = await async_client.post(
             "/api/v1/scenes/design-shots",
-            json={"scene_id": str(uuid.uuid4())}
+            json={"scene_id": 1}
         )
 
     assert response.status_code == 429
@@ -98,7 +97,7 @@ async def test_design_shots_insufficient_description(async_client: AsyncClient):
     ):
         response = await async_client.post(
             "/api/v1/scenes/design-shots",
-            json={"scene_id": str(uuid.uuid4())}
+            json={"scene_id": 1}
         )
 
     assert response.status_code == 400
@@ -115,7 +114,7 @@ async def test_design_shots_upstream_timeout(async_client: AsyncClient):
     ):
         response = await async_client.post(
             "/api/v1/scenes/design-shots",
-            json={"scene_id": str(uuid.uuid4())}
+            json={"scene_id": 1}
         )
 
     assert response.status_code == 503
@@ -132,7 +131,7 @@ async def test_design_shots_schema_validation_error(async_client: AsyncClient):
     ):
         response = await async_client.post(
             "/api/v1/scenes/design-shots",
-            json={"scene_id": str(uuid.uuid4())}
+            json={"scene_id": 1}
         )
 
     assert response.status_code == 502
@@ -144,11 +143,11 @@ async def test_design_shots_schema_validation_error(async_client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_anti_hallucination_kb_filtering(mock_db_session):
-    """Invented KB UUIDs from LLM output are purged before DB insertion."""
-    real_kb_id = uuid.uuid4()
-    hallucinated_kb_id = uuid.uuid4()
+    """Invented KB IDs from LLM output are purged before DB insertion."""
+    real_kb_id = 1
+    hallucinated_kb_id = 9999
 
-    scene = make_scene()
+    scene = make_scene(scene_id=1)
     real_kb_item = KnowledgeBase(
         id=real_kb_id,
         technique_name="High Angle",
@@ -162,8 +161,7 @@ async def test_anti_hallucination_kb_filtering(mock_db_session):
     )
 
     fake_llm = FakeLLMProvider()
-    # Inject both real and hallucinated IDs into LLM output
-    fake_llm.output.recommendations[0].knowledge_base_ids = [str(real_kb_id), str(hallucinated_kb_id)]
+    fake_llm.output.recommendations[0].knowledge_base_ids = [real_kb_id, hallucinated_kb_id]
 
     with patch("services.shot_designer.get_daily_generation_count", AsyncMock(return_value=0)), \
          patch("services.shot_designer.get_scene_by_id", AsyncMock(return_value=scene)), \
@@ -172,13 +170,13 @@ async def test_anti_hallucination_kb_filtering(mock_db_session):
         recs = await generate_shot_recommendations(mock_db_session, TEST_USER_ID, scene.id, fake_llm)
 
     # First recommendation should ONLY contain real_kb_id, hallucinated_kb_id was stripped
-    assert recs[0].knowledge_base_ids == [str(real_kb_id)]
+    assert recs[0].knowledge_base_ids == [real_kb_id]
 
 
 @pytest.mark.asyncio
 async def test_transaction_rollback_on_persistence_failure(mock_db_session):
     """If database commit fails, rollback is triggered and no partial data remains."""
-    scene = make_scene()
+    scene = make_scene(scene_id=1)
     fake_llm = FakeLLMProvider()
 
     mock_db_session.commit.side_effect = Exception("DB Connection dropped during commit")
@@ -191,5 +189,4 @@ async def test_transaction_rollback_on_persistence_failure(mock_db_session):
             await generate_shot_recommendations(mock_db_session, TEST_USER_ID, scene.id, fake_llm)
 
         assert "DB Connection dropped" in str(exc_info.value)
-        # Verify rollback was called
         mock_db_session.rollback.assert_called_once()

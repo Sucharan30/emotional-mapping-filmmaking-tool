@@ -56,7 +56,7 @@ async def list_knowledge_base_items(
 
 
 async def get_kb_item_by_id(
-    db: AsyncSession, kb_id: uuid.UUID
+    db: AsyncSession, kb_id: int
 ) -> Optional[KnowledgeBase]:
     """Retrieves a single knowledge base entry by ID."""
     query = select(KnowledgeBase).where(KnowledgeBase.id == kb_id)

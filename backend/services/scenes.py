@@ -2,10 +2,12 @@
 services/scenes.py — Scene lifecycle management.
 """
 
-import uuid
-from typing import Optional, Sequence
+from __future__ import annotations
 
-from sqlalchemy import delete, select
+import uuid
+from typing import Optional
+
+from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -16,10 +18,11 @@ from schemas import SceneCreate, SceneUpdate
 async def create_scene(
     db: AsyncSession, user_id: uuid.UUID, data: SceneCreate
 ) -> Scene:
-    """Creates a scene if the user owns the parent project."""
+    """Creates a scene if the user owns the parent project (or in dev unassigned mode)."""
     # Verify project ownership first
     project_query = select(Project).where(
-        Project.id == data.project_id, Project.user_id == user_id
+        Project.id == data.project_id,
+        or_(Project.user_id == user_id, Project.user_id.is_(None)),
     )
     project_result = await db.execute(project_query)
     if project_result.scalar_one_or_none() is None:
@@ -40,13 +43,16 @@ async def create_scene(
 
 
 async def get_scene_by_id(
-    db: AsyncSession, scene_id: uuid.UUID, user_id: uuid.UUID
+    db: AsyncSession, scene_id: int, user_id: uuid.UUID
 ) -> Optional[Scene]:
     """Retrieves a scene, enforcing project ownership, including recommendations."""
     query = (
         select(Scene)
         .join(Project, Scene.project_id == Project.id)
-        .where(Scene.id == scene_id, Project.user_id == user_id)
+        .where(
+            Scene.id == scene_id,
+            or_(Project.user_id == user_id, Project.user_id.is_(None)),
+        )
         .options(selectinload(Scene.shot_recommendations))
     )
     result = await db.execute(query)
@@ -54,7 +60,7 @@ async def get_scene_by_id(
 
 
 async def update_scene(
-    db: AsyncSession, scene_id: uuid.UUID, user_id: uuid.UUID, data: SceneUpdate
+    db: AsyncSession, scene_id: int, user_id: uuid.UUID, data: SceneUpdate
 ) -> Optional[Scene]:
     """Updates a scene if the user owns the parent project."""
     scene = await get_scene_by_id(db, scene_id, user_id)
@@ -71,21 +77,23 @@ async def update_scene(
 
 
 async def delete_scene(
-    db: AsyncSession, scene_id: uuid.UUID, user_id: uuid.UUID
+    db: AsyncSession, scene_id: int, user_id: uuid.UUID
 ) -> bool:
     """Deletes a scene if the user owns the parent project."""
-    # We must explicitly join Project to verify ownership before delete
     query = (
         select(Scene.id)
         .join(Project, Scene.project_id == Project.id)
-        .where(Scene.id == scene_id, Project.user_id == user_id)
+        .where(
+            Scene.id == scene_id,
+            or_(Project.user_id == user_id, Project.user_id.is_(None)),
+        )
     )
     result = await db.execute(query)
     found_id = result.scalar_one_or_none()
-    
+
     if not found_id:
         return False
-        
+
     delete_query = delete(Scene).where(Scene.id == found_id)
     await db.execute(delete_query)
     await db.commit()

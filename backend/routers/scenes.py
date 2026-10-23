@@ -4,7 +4,6 @@ routers/scenes.py — Scenes and Shot Designer router.
 
 from __future__ import annotations
 
-import uuid
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -44,7 +43,7 @@ async def create_scene(
 
 @router.get("/{scene_id}", response_model=SceneResponse)
 async def get_scene(
-    scene_id: uuid.UUID,
+    scene_id: int,
     user: AuthUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -59,7 +58,7 @@ async def get_scene(
 
 @router.patch("/{scene_id}", response_model=SceneResponse)
 async def update_scene(
-    scene_id: uuid.UUID,
+    scene_id: int,
     data: SceneUpdate,
     user: AuthUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -75,7 +74,7 @@ async def update_scene(
 
 @router.delete("/{scene_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_scene(
-    scene_id: uuid.UUID,
+    scene_id: int,
     user: AuthUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -89,7 +88,7 @@ async def delete_scene(
 
 @router.get("/{scene_id}/recommendations", response_model=List[ShotRecommendationResponse])
 async def get_scene_recommendations(
-    scene_id: uuid.UUID,
+    scene_id: int,
     user: AuthUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -144,4 +143,20 @@ async def generate_shot_recommendations(
         scene_id=req.scene_id,
         recommendations=recs,
         model_used=model_used,
+    )
+
+
+@router.post("/{scene_id}/shot-designer", response_model=ShotDesignerResponse)
+async def generate_shot_recommendations_by_path(
+    scene_id: int,
+    user: AuthUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    llm: LLMProvider = Depends(get_llm),
+):
+    """Convenience alias: allows passing scene_id in the URL path."""
+    return await generate_shot_recommendations(
+        req=ShotDesignerRequest(scene_id=scene_id),
+        user=user,
+        db=db,
+        llm=llm,
     )

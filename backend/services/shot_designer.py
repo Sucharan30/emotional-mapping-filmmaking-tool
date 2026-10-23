@@ -67,7 +67,7 @@ async def get_daily_generation_count(db: AsyncSession, user_id: uuid.UUID) -> in
 async def generate_shot_recommendations(
     db: AsyncSession,
     user_id: uuid.UUID,
-    scene_id: uuid.UUID,
+    scene_id: int,
     llm: LLMProvider,
 ) -> List[ShotRecommendation]:
     """
@@ -140,7 +140,6 @@ KNOWLEDGE BASE CONTEXT:
             "LLM returned %s recommendations, expected between %s and %s",
             recs_count, SHOT_RECS_MIN, SHOT_RECS_MAX
         )
-        # If model returned slightly outside range, clamp or validate
         if recs_count < SHOT_RECS_MIN:
             raise LLMValidationError(
                 f"The AI generated only {recs_count} recommendations. Expected at least {SHOT_RECS_MIN}."
@@ -157,7 +156,7 @@ KNOWLEDGE BASE CONTEXT:
         for idx, rec in enumerate(output.recommendations[:SHOT_RECS_MAX], start=1):
             # Anti-hallucination filter: Keep only IDs that were actually in the context
             filtered_kb_ids = [
-                str(raw_id) for raw_id in rec.knowledge_base_ids
+                raw_id for raw_id in rec.knowledge_base_ids
                 if str(raw_id) in valid_kb_id_strings
             ]
 

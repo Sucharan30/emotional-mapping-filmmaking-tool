@@ -1,8 +1,9 @@
 """
 schemas.py — Pydantic v2 request/response models.
 
-These define the API contract — what the frontend sends and receives.
-All validation against controlled vocabularies reads from constants.py.
+Reconciled to match live Supabase database identifiers:
+  - projects.id: UUID
+  - scenes.id, shot_recommendations.id, knowledge_base.id: int
 """
 
 from __future__ import annotations
@@ -73,12 +74,12 @@ class ProjectResponse(BaseModel):
     model_config = {"from_attributes": True}
 
     id: uuid.UUID
-    user_id: uuid.UUID
+    user_id: Optional[uuid.UUID] = None
     name: str
-    type: str
+    type: Optional[str] = "shot_design"
     description: Optional[str] = None
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     scenes: Optional[List[SceneResponse]] = None
 
 
@@ -154,18 +155,18 @@ class SceneUpdate(BaseModel):
 class SceneResponse(BaseModel):
     model_config = {"from_attributes": True}
 
-    id: uuid.UUID
+    id: int
     project_id: uuid.UUID
     description: str
     target_emotion: Optional[str] = None
     character_focus: Optional[str] = None
-    production_budget: str
+    production_budget: Optional[str] = "medium"
     budget_notes: Optional[str] = None
     video_url: Optional[str] = None
     video_analysis: Optional[Any] = None
-    experiment_group_id: Optional[uuid.UUID] = None
+    experiment_group_id: Optional[int] = None
     variant_label: Optional[str] = None
-    created_at: datetime
+    created_at: Optional[datetime] = None
     shot_recommendations: Optional[List[ShotRecommendationResponse]] = None
 
 
@@ -174,7 +175,7 @@ class SceneResponse(BaseModel):
 class KnowledgeBaseResponse(BaseModel):
     model_config = {"from_attributes": True}
 
-    id: uuid.UUID
+    id: int
     technique_name: str
     category: str
     visual_characteristic: str
@@ -230,7 +231,7 @@ class LLMShotRecommendation(BaseModel):
     context_caveat: str
     production_complexity: ProductionComplexity
     budget_fit: BudgetFit
-    knowledge_base_ids: List[str] = Field(default_factory=list)
+    knowledge_base_ids: List[Any] = Field(default_factory=list)
 
 
 class LLMShotDesignerOutput(BaseModel):
@@ -241,8 +242,8 @@ class LLMShotDesignerOutput(BaseModel):
 class ShotRecommendationResponse(BaseModel):
     model_config = {"from_attributes": True}
 
-    id: uuid.UUID
-    scene_id: uuid.UUID
+    id: int
+    scene_id: int
     rank: int
     perspective_name: str
     reasoning: str
@@ -252,17 +253,17 @@ class ShotRecommendationResponse(BaseModel):
     production_complexity_reason: str
     budget_fit: str
     budget_fit_reason: str
-    knowledge_base_ids: List[str]
+    knowledge_base_ids: List[Any]
     model_name: Optional[str] = None
     created_at: datetime
 
 
 class ShotDesignerRequest(BaseModel):
-    scene_id: uuid.UUID
+    scene_id: int
 
 
 class ShotDesignerResponse(BaseModel):
-    scene_id: uuid.UUID
+    scene_id: int
     recommendations: List[ShotRecommendationResponse]
     model_used: Optional[str] = None
 
