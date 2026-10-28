@@ -177,19 +177,21 @@ class KnowledgeBaseResponse(BaseModel):
 
     id: int
     technique_name: str
-    category: str
-    visual_characteristic: str
-    potential_emotions: List[str]
-    context_note: str
+    category: Optional[str] = "general"
+    visual_characteristic: Optional[str] = ""
+    potential_emotions: Optional[List[str]] = Field(default_factory=list)
+    context_note: Optional[str] = ""
     example_scene: Optional[str] = None
     equipment_needs: Optional[str] = None
-    typical_complexity: str
-    review_status: str
+    typical_complexity: Optional[str] = "Low"
+    review_status: Optional[str] = "draft"
     source_note: Optional[str] = None
-    created_at: datetime
+    created_at: Optional[datetime] = None
 
 
 class KnowledgeBaseListResponse(BaseModel):
+    model_config = {"from_attributes": True}
+
     items: List[KnowledgeBaseResponse]
     total: int
     limit: int
@@ -240,7 +242,7 @@ class LLMShotDesignerOutput(BaseModel):
 
 
 class ShotRecommendationResponse(BaseModel):
-    model_config = {"from_attributes": True}
+    model_config = {"from_attributes": True, "protected_namespaces": ()}
 
     id: int
     scene_id: int
@@ -255,7 +257,7 @@ class ShotRecommendationResponse(BaseModel):
     budget_fit_reason: str
     knowledge_base_ids: List[Any]
     model_name: Optional[str] = None
-    created_at: datetime
+    created_at: Optional[datetime] = None
 
 
 class ShotDesignerRequest(BaseModel):
@@ -263,6 +265,8 @@ class ShotDesignerRequest(BaseModel):
 
 
 class ShotDesignerResponse(BaseModel):
+    model_config = {"protected_namespaces": ()}
+
     scene_id: int
     recommendations: List[ShotRecommendationResponse]
     model_used: Optional[str] = None

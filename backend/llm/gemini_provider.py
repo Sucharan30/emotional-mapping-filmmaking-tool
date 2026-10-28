@@ -15,18 +15,81 @@ Configuration comes directly from config.py.
 from __future__ import annotations
 
 import asyncio
+import copy
 import logging
-from typing import Tuple, Type
+from typing import Any, Dict, Tuple, Type
 
 from google import genai
 from google.genai import types
 from google.genai.errors import APIError
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from config import settings
 from llm.base import LLMError, LLMProvider, LLMUsage, LLMValidationError, T
 
 logger = logging.getLogger(__name__)
+
+
+def _to_gemini_schema(model_or_schema: Any) -> Dict[str, Any]:
+    """
+    Converts a Pydantic model to a clean, fully inlined OpenAPI 3.0 schema dictionary
+    compatible with the google-genai SDK.
+
+    The google-genai SDK's types.Schema rejects '$defs' and '$ref' pointers when validating
+    Pydantic schemas. This helper inlines all definitions recursively and converts types
+    to uppercase strings expected by Gemini.
+    """
+    if isinstance(model_or_schema, dict):
+        return model_or_schema
+
+    if not hasattr(model_or_schema, "model_json_schema"):
+        return model_or_schema
+
+    raw_schema = model_or_schema.model_json_schema()
+    defs = raw_schema.pop("$defs", {})
+
+    def _resolve(node: Any) -> Any:
+        if isinstance(node, dict):
+            # Resolve all $ref occurrences by inlining from defs
+            while "$ref" in node:
+                ref_key = node.pop("$ref").split("/")[-1]
+                if ref_key in defs:
+                    target = copy.deepcopy(defs[ref_key])
+                    target.pop("$defs", None)
+                    node = {**target, **node}
+                else:
+                    break
+
+            # Strip metadata fields that google-genai Schema rejects
+            node.pop("title", None)
+            node.pop("$defs", None)
+            node.pop("default", None)
+
+            # Uppercase types for Gemini OpenAPI spec
+            if "type" in node and isinstance(node["type"], str):
+                node["type"] = node["type"].upper()
+
+            # Ensure ARRAY items are properly typed
+            if node.get("type") == "ARRAY":
+                if "items" not in node or not node["items"]:
+                    node["items"] = {"type": "STRING"}
+                elif (
+                    isinstance(node["items"], dict)
+                    and "type" not in node["items"]
+                    and "$ref" not in node["items"]
+                ):
+                    node["items"]["type"] = "STRING"
+
+            # Recurse through all dictionary values
+            for k in list(node.keys()):
+                node[k] = _resolve(node[k])
+
+            return node
+        elif isinstance(node, list):
+            return [_resolve(item) for item in node]
+        return node
+
+    return _resolve(raw_schema)
 
 
 class GeminiProvider(LLMProvider):
@@ -36,10 +99,13 @@ class GeminiProvider(LLMProvider):
     """
 
     def __init__(self) -> None:
-        self._client = genai.Client(api_key=settings.gemini_api_key)
         self._model = settings.gemini_model
         self._thinking_budget = settings.thinking_budget
         self._timeout_seconds = settings.llm_timeout_seconds
+        self._client = genai.Client(
+            api_key=settings.gemini_api_key,
+            http_options={"timeout": float(self._timeout_seconds)},
+        )
 
     async def generate_structured(
         self,
@@ -55,8 +121,29 @@ class GeminiProvider(LLMProvider):
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             response_model=response_model,
-            retries_left=1,
+            retries_left=3,
         )
+
+    def _discover_best_model(self) -> str:
+        """
+        Dynamically queries Google GenAI for all models available to this API key
+        and picks the best supported Flash model.
+        """
+        try:
+            available = []
+            for m in self._client.models.list():
+                name = m.name.replace("models/", "")
+                available.append(name)
+            logger.info("Available Gemini models for your API key: %s", available)
+            # Find first flash model or first supported model
+            for candidate in available:
+                if "flash" in candidate.lower() and "embed" not in candidate.lower():
+                    return candidate
+            if available:
+                return available[0]
+        except Exception as e:
+            logger.warning("Could not automatically list models: %s", e)
+        return self._model
 
     async def _call_with_retry(
         self,
@@ -68,7 +155,7 @@ class GeminiProvider(LLMProvider):
         config_kwargs = {
             "system_instruction": system_prompt,
             "response_mime_type": "application/json",
-            "response_schema": response_model,
+            "response_schema": _to_gemini_schema(response_model),
             "temperature": 0.7,
         }
 
@@ -84,8 +171,11 @@ class GeminiProvider(LLMProvider):
         config = types.GenerateContentConfig(**config_kwargs)
 
         try:
+            # Use asyncio.to_thread with synchronous generate_content to eliminate
+            # Windows asyncio socket hangs and IOCP half-open stalls
             response = await asyncio.wait_for(
-                self._client.aio.models.generate_content(
+                asyncio.to_thread(
+                    self._client.models.generate_content,
                     model=self._model,
                     contents=user_prompt,
                     config=config,
@@ -93,12 +183,45 @@ class GeminiProvider(LLMProvider):
                 timeout=float(self._timeout_seconds),
             )
         except asyncio.TimeoutError:
-            logger.error("Gemini API call timed out after %s seconds", self._timeout_seconds)
+            logger.warning(
+                "Gemini API call timed out after %s seconds with model %s. Retries left: %s",
+                self._timeout_seconds,
+                self._model,
+                retries_left,
+            )
+            if retries_left > 0:
+                discovered = await asyncio.to_thread(self._discover_best_model)
+                if discovered and discovered != self._model:
+                    self._model = discovered
+                    logger.info("Switching to discovered model: %s", self._model)
+                await asyncio.sleep(2)
+                return await self._call_with_retry(
+                    system_prompt,
+                    user_prompt,
+                    response_model,
+                    retries_left - 1,
+                )
             raise LLMError("The AI service request timed out. Please try again.")
         except APIError as exc:
             logger.error("Gemini API error: %s (status=%s)", exc, getattr(exc, "code", None))
             err_str = str(exc).lower()
             code = getattr(exc, "code", None)
+
+            # Auto-handle model deprecation / 404 or 503 high demand with auto-discovery
+            if code in (404, 503) or "not_found" in err_str or "unavailable" in err_str:
+                if retries_left > 0:
+                    discovered = await asyncio.to_thread(self._discover_best_model)
+                    if discovered and discovered != self._model:
+                        self._model = discovered
+                        logger.info("Switching to discovered model: %s", self._model)
+                    delay = 3
+                    logger.warning("Retrying with model %s in %ds...", self._model, delay)
+                    await asyncio.sleep(delay)
+                    return await self._call_with_retry(
+                        system_prompt, user_prompt, response_model, retries_left - 1
+                    )
+                raise LLMError("The AI service is currently unavailable or high demand. Please try again later.")
+
             if code == 429 or "quota" in err_str or "resource_exhausted" in err_str:
                 raise LLMError("AI rate limit or quota exceeded. Please try again later.")
             if code in (401, 403) or "unauthenticated" in err_str or "permission" in err_str:

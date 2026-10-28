@@ -5,6 +5,7 @@ services/scenes.py — Scene lifecycle management.
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import delete, or_, select
@@ -35,6 +36,7 @@ async def create_scene(
         character_focus=data.character_focus,
         production_budget=data.production_budget,
         budget_notes=data.budget_notes,
+        created_at=datetime.now(timezone.utc),
     )
     db.add(scene)
     await db.commit()

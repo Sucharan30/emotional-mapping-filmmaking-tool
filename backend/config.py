@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     #           → Connection pooling → Transaction mode → URI
     database_url: str = Field(
         "postgresql://postgres:postgres@localhost:5432/postgres",
+        validation_alias=AliasChoices("DATABASE_URL", "DATABSE_URL"),
         description=(
             "PostgreSQL connection URL. Use Supabase transaction pooler "
             "(port 6543) for Render deployments."
@@ -68,14 +69,14 @@ class Settings(BaseSettings):
         description="Google Gemini API key from https://aistudio.google.com/",
     )
 
-    # Default to current GA model 'gemini-2.0-flash' (or 'gemini-1.5-flash').
+    # Default to 'gemini-3.8-flash' (or other GA flash model).
     # Configurable via GEMINI_MODEL in .env.
     gemini_model: str = Field(
-        "gemini-2.0-flash",
-        description="Gemini model name (e.g. gemini-2.0-flash, gemini-1.5-flash)",
+        "gemini-3.8-flash",
+        description="Gemini model name (e.g. gemini-3.8-flash, gemini-2.5-flash, gemini-1.5-flash)",
     )
 
-    llm_timeout_seconds: int = Field(60, description="LLM request timeout in seconds")
+    llm_timeout_seconds: int = Field(120, description="LLM request timeout in seconds")
 
     # Controls the thinking budget for Gemini 2.0+ models supporting thinking.
     # Values: none (0), low (1024), medium (8192), high (24576)

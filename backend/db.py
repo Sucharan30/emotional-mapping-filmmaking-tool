@@ -15,8 +15,10 @@ Find this URL in:
   -> Connection pooling -> Transaction -> URI
 """
 
+import uuid
 from collections.abc import AsyncGenerator
 
+from sqlalchemy.pool import NullPool
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     create_async_engine,
@@ -25,14 +27,19 @@ from sqlalchemy.ext.asyncio import (
 
 from config import settings
 
-# asyncpg connect_args:
-#   prepared_statement_cache_size=0 is required for pgBouncer
-#   transaction pooler (Supabase's default pooling mode).
-_CONNECT_ARGS: dict = {"prepared_statement_cache_size": 0}
+# asyncpg connect_args for Supabase PgBouncer transaction pooling (port 6543):
+# 1. prepared_statement_name_func generates unique UUID statement names so they
+#    never collide with existing prepared statements across pooled backend connections.
+# 2. statement_cache_size=0 and prepared_statement_cache_size=0 disable statement caching.
+_CONNECT_ARGS: dict = {
+    "prepared_statement_cache_size": 0,
+    "statement_cache_size": 0,
+    "prepared_statement_name_func": lambda: f"__asyncpg_{uuid.uuid4()}__",
+}
 
 engine = create_async_engine(
     settings.async_database_url,
-    pool_pre_ping=True,           # verify connections before use
+    poolclass=NullPool,
     connect_args=_CONNECT_ARGS,
     echo=(settings.env == "development"),  # log SQL in dev only
 )

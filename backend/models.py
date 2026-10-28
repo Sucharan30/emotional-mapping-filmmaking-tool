@@ -49,10 +49,13 @@ class Project(Base):
     type: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), server_default=func.now()
+        TIMESTAMP(timezone=True), server_default=func.now(), default=func.now()
     )
-    updated_at: Mapped[Optional[datetime]] = mapped_column(
-        TIMESTAMP(timezone=True), onupdate=func.now()
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        server_default=func.now(),
+        default=func.now(),
+        onupdate=func.now(),
     )
 
     scenes: Mapped[list[Scene]] = relationship(
@@ -79,11 +82,11 @@ class KnowledgeBase(Base):
     context_note: Mapped[str] = mapped_column(Text, nullable=False)
     example_scene: Mapped[Optional[str]] = mapped_column(Text)
     equipment_needs: Mapped[Optional[str]] = mapped_column(Text)
-    typical_complexity: Mapped[str] = mapped_column(Text, nullable=False, default="Low")
-    review_status: Mapped[str] = mapped_column(Text, nullable=False, default="draft")
+    typical_complexity: Mapped[Optional[str]] = mapped_column(Text, default="Low")
+    review_status: Mapped[Optional[str]] = mapped_column(Text, default="draft")
     source_note: Mapped[Optional[str]] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), server_default=func.now()
+    created_at: Mapped[Optional[datetime]] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.now(), default=func.now()
     )
 
 
@@ -108,7 +111,7 @@ class Scene(Base):
     experiment_group_id: Mapped[Optional[int]] = mapped_column(Integer)
     variant_label: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), server_default=func.now()
+        TIMESTAMP(timezone=True), server_default=func.now(), default=func.now()
     )
 
     project: Mapped[Project] = relationship("Project", back_populates="scenes")
@@ -144,7 +147,7 @@ class ShotRecommendation(Base):
     knowledge_base_ids: Mapped[Any] = mapped_column(JSONB, nullable=False, default=list)
     model_name: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), server_default=func.now()
+        TIMESTAMP(timezone=True), server_default=func.now(), default=func.now()
     )
 
     scene: Mapped[Scene] = relationship("Scene", back_populates="shot_recommendations")
@@ -164,7 +167,7 @@ class AiUsage(Base):
     input_tokens: Mapped[Optional[int]] = mapped_column(Integer)
     output_tokens: Mapped[Optional[int]] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), server_default=func.now()
+        TIMESTAMP(timezone=True), server_default=func.now(), default=func.now()
     )
 
     __table_args__ = (
@@ -186,7 +189,7 @@ class Persona(Base):
     film_familiarity: Mapped[Optional[str]] = mapped_column(Text)
     description: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), server_default=func.now()
+        TIMESTAMP(timezone=True), server_default=func.now(), default=func.now()
     )
 
 
@@ -211,7 +214,7 @@ class AudienceFeedback(Base):
     reasoning: Mapped[Optional[str]] = mapped_column(Text)
     model_name: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), server_default=func.now()
+        TIMESTAMP(timezone=True), server_default=func.now(), default=func.now()
     )
 
 
@@ -231,5 +234,5 @@ class ExperimentResponse(Base):
     emotional_intensity_rating: Mapped[Optional[float]] = mapped_column(Numeric(3, 1))
     notes: Mapped[Optional[str]] = mapped_column(Text)
     submitted_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), server_default=func.now()
+        TIMESTAMP(timezone=True), server_default=func.now(), default=func.now()
     )

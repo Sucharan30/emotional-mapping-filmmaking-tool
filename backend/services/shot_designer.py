@@ -173,6 +173,7 @@ KNOWLEDGE BASE CONTEXT:
                 budget_fit_reason=rec.budget_fit.reason,
                 knowledge_base_ids=filtered_kb_ids,
                 model_name=usage.model,
+                created_at=datetime.now(timezone.utc),
             )
             db.add(db_rec)
             new_recs.append(db_rec)
@@ -184,6 +185,7 @@ KNOWLEDGE BASE CONTEXT:
             model_name=usage.model,
             input_tokens=usage.input_tokens,
             output_tokens=usage.output_tokens,
+            created_at=datetime.now(timezone.utc),
         )
         db.add(usage_log)
 

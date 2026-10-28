@@ -96,14 +96,15 @@ async def llm_exception_handler(request: Request, exc: LLMError):
 
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, exc: Exception):
-    """Catch-all to guarantee unhandled exceptions never expose stack traces to client."""
+    """Catch-all to guarantee unhandled exceptions return informative messages."""
     logger.exception("Unhandled server exception: %s", exc)
+    error_msg = f"{type(exc).__name__}: {str(exc)}"
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
             "error": {
                 "code": "internal_server_error",
-                "message": "An unexpected internal server error occurred. Please try again.",
+                "message": error_msg,
             }
         },
     )

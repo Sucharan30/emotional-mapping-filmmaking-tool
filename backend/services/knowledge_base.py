@@ -37,8 +37,8 @@ async def list_knowledge_base_items(
         count_query = count_query.where(KnowledgeBase.category == category)
 
     if emotion:
-        query = query.where(KnowledgeBase.potential_emotions.any(emotion))
-        count_query = count_query.where(KnowledgeBase.potential_emotions.any(emotion))
+        query = query.where(KnowledgeBase.potential_emotions.contains([emotion]))
+        count_query = count_query.where(KnowledgeBase.potential_emotions.contains([emotion]))
 
     if review_status:
         query = query.where(KnowledgeBase.review_status == review_status)
@@ -83,7 +83,7 @@ async def retrieve_relevant_kb_items(
     items: list[KnowledgeBase] = []
 
     if target_emotion:
-        match_query = base_query.where(KnowledgeBase.potential_emotions.any(target_emotion))
+        match_query = base_query.where(KnowledgeBase.potential_emotions.contains([target_emotion]))
         result = await db.execute(match_query)
         items = list(result.scalars().all())
 

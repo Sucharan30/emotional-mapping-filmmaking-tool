@@ -30,6 +30,10 @@ ALTER TABLE projects
     ADD COLUMN IF NOT EXISTS description TEXT,
     ADD COLUMN IF NOT EXISTS updated_at  TIMESTAMPTZ DEFAULT NOW();
 
+-- Ensure timestamp defaults exist even if columns were previously created without them
+ALTER TABLE projects
+    ALTER COLUMN updated_at SET DEFAULT NOW();
+
 -- Create index on user_id for fast user project lookups
 CREATE INDEX IF NOT EXISTS idx_projects_user_id
     ON projects (user_id);
